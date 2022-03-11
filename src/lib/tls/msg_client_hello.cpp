@@ -503,18 +503,24 @@ Client_Hello_12::Client_Hello_12(Handshake_IO& io,
 * Create a new Client Hello message
 */
 Client_Hello_13::Client_Hello_13(const Policy& policy,
-                           Callbacks& cb,
-                           RandomNumberGenerator& rng,
-                           const std::vector<uint8_t>& reneg_info,
-                           const Client_Hello::Settings& client_settings,
-                           const std::vector<std::string>& next_protocols) :
+                                 Callbacks& cb,
+                                 RandomNumberGenerator& rng,
+                                 const std::vector<uint8_t>& reneg_info,
+                                 const Client_Hello::Settings& client_settings,
+                                 const std::vector<std::string>& next_protocols) :
    Client_Hello(policy, cb, rng, reneg_info, client_settings, next_protocols)
    {
    // Always use TLS 1.2 as a legacy version
    m_legacy_version = Protocol_Version::TLS_V12;
 
-   //TODO: Compatibility mode, does not need to be random
-   // m_session_id = make_hello_random(rng, policy);
+   if(policy.tls_13_middlebox_compatibility_mode())
+      {
+      // RFC 8446 4.1.2
+      //    In compatibility mode (see Appendix D.4), this field MUST be non-empty,
+      //    so a client not offering a pre-TLS 1.3 session MUST generate a new
+      //    32-byte value.
+      rng.random_vec(m_session_id, 32);
+      }
 
    // TODO: check when to set these -- setting for rfc8448 now
    m_extensions.add(new Server_Name_Indicator(client_settings.hostname()));
@@ -532,7 +538,7 @@ Client_Hello_13::Client_Hello_13(const Policy& policy,
    // TODO: this is currently hard-coded to PSK_DHE_KE (to please RFC 8448)
    m_extensions.add(new PSK_Key_Exchange_Modes({PSK_Key_Exchange_Mode::PSK_DHE_KE}));
 
-   if (policy.record_size_limit().has_value())
+   if(policy.record_size_limit().has_value())
       {
       m_extensions.add(new Record_Size_Limit(policy.record_size_limit().value()));
       }
